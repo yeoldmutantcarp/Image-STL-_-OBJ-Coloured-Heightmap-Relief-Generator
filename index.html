@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<!-- saved from url=(0045)file:///C:/Users/astro/Downloads/Img2DDD.html -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Image → STL / OBJ (Colored) · Heightmap Relief Generator</title>
+<style>
+  :root{
+    --bg:#0b0d13;
+    --panel:#10141d;
+    --card:#141926;
+    --line:#1f2738;
+    --fg:#e6ecf7;
+    --muted:#8592ad;
+    --accent:#5b8cff;
+    --accent2:#8f6bff;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;height:100vh;display:flex;overflow:hidden;
+    background:var(--bg);color:var(--fg);
+    font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Inter,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ---------- Sidebar ---------- */
+  #panel{
+    width:368px;flex:0 0 368px;height:100%;overflow-y:auto;
+    padding:26px 22px 32px;background:var(--panel);
+    border-right:1px solid var(--line);
+    display:flex;flex-direction:column;gap:20px;
+  }
+  #panel::-webkit-scrollbar{width:8px;}
+  #panel::-webkit-scrollbar-thumb{background:#222a3d;border-radius:8px;}
+
+  header h1{
+    margin:0 0 6px;font-size:21px;font-weight:800;letter-spacing:-.02em;
+    background:linear-gradient(100deg,#fff 10%,#8fb4ff 60%,#a98bff 100%);
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+  }
+  header p{margin:0;font-size:12.5px;line-height:1.6;color:var(--muted);}
+
+  .card{
+    background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:16px;display:flex;flex-direction:column;gap:14px;
+  }
+  .card h2{
+    margin:0;font-size:11px;font-weight:700;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--muted);
+  }
+
+  /* Upload */
+  .upload{
+    display:flex;flex-direction:column;align-items:center;gap:8px;
+    padding:22px 16px;border:1.5px dashed #2a3550;border-radius:12px;
+    cursor:pointer;text-align:center;transition:.2s;
+  }
+  .upload:hover,.upload.drag{
+    border-color:var(--accent);background:rgba(91,140,255,.06);
+  }
+  .upload svg{
+    width:30px;height:30px;stroke:var(--accent);fill:none;stroke-width:1.8;
+    stroke-linecap:round;stroke-linejoin:round;margin-bottom:2px;
+  }
+  .upload strong{font-size:13.5px;font-weight:600;}
+  .upload span{font-size:11.5px;color:var(--muted);}
+  #fileName{font-size:12px;color:var(--muted);text-align:center;word-break:break-all;}
+
+  /* Fields */
+  .field{display:flex;flex-direction:column;gap:7px;}
+  .field > label{
+    display:flex;justify-content:space-between;align-items:center;
+    font-size:12px;font-weight:600;color:#c2cde3;
+  }
+  .field output{font:600 11.5px ui-monospace,Menlo,monospace;color:#9fb4e8;}
+  input[type=range]{
+    -webkit-appearance:none;appearance:none;width:100%;height:3px;border-radius:3px;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));outline:none;cursor:pointer;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;width:14px;height:14px;border-radius:50%;
+    background:#fff;border:2px solid var(--accent);
+    box-shadow:0 0 10px rgba(91,140,255,.7);cursor:grab;
+  }
+  input[type=range]::-moz-range-thumb{
+    width:12px;height:12px;border-radius:50%;background:#fff;
+    border:2px solid var(--accent);box-shadow:0 0 10px rgba(91,140,255,.7);
+  }
+  .checkbox{flex-direction:row;align-items:center;gap:9px;}
+  .checkbox input{width:16px;height:16px;accent-color:var(--accent);cursor:pointer;}
+  .checkbox label{font-size:12.5px;color:#c2cde3;cursor:pointer;}
+
+  /* Actions */
+  .actions{display:flex;flex-direction:column;gap:10px;}
+  button{
+    font-family:inherit;font-size:13px;font-weight:700;letter-spacing:.03em;
+    padding:13px 16px;border-radius:11px;cursor:pointer;border:1px solid var(--line);
+    background:#1a2233;color:#c9d6f5;transition:.18s;
+  }
+  button:hover:not(:disabled){background:#22304a;color:#fff;}
+  button:disabled{opacity:.45;cursor:not-allowed;}
+  button.primary{
+    border:none;color:#fff;
+    background:linear-gradient(100deg,var(--accent),var(--accent2));
+    box-shadow:0 10px 26px rgba(91,140,255,.35);
+  }
+  button.primary:hover:not(:disabled){
+    box-shadow:0 14px 34px rgba(91,140,255,.5);transform:translateY(-1px);
+  }
+  button.primary:disabled{box-shadow:none;}
+
+  button.color{
+    border:none;color:#fff;
+    background:linear-gradient(100deg,#3fb28a,#4ba7ff);
+    box-shadow:0 10px 26px rgba(75,167,255,.32);
+  }
+  button.color:hover:not(:disabled){
+    box-shadow:0 14px 34px rgba(75,167,255,.5);transform:translateY(-1px);
+  }
+  button.color:disabled{box-shadow:none;}
+
+  #status{
+    font-size:12px;line-height:1.55;color:var(--muted);
+    padding:0 2px;min-height:32px;
+  }
+
+  /* ---------- Viewport ---------- */
+  #viewport{
+    flex:1;position:relative;min-width:0;height:100%;
+    background:radial-gradient(circle at 50% 35%,#141a28 0%,#080a10 70%);
+  }
+  #previewCanvas{display:block;width:100%;height:100%;touch-action:none;}
+  #placeholder{
+    position:absolute;inset:0;display:grid;place-items:center;
+    font-size:13px;letter-spacing:.08em;text-transform:uppercase;
+    color:#4a5670;pointer-events:none;
+  }
+  #noWebgl{
+    position:absolute;inset:0;display:grid;place-items:center;
+    padding:30px;text-align:center;font-size:13px;line-height:1.6;
+    color:#ff9aa8;background:rgba(40,10,16,.55);backdrop-filter:blur(6px);
+  }
+  #noWebgl[hidden]{display:none;}
+
+  #fitBtn{
+    position:absolute;right:16px;top:16px;width:38px;height:38px;
+    padding:0;border-radius:10px;font-size:17px;line-height:1;
+    background:rgba(20,25,38,.8);backdrop-filter:blur(8px);
+    display:none;
+  }
+  #fitBtn.show{display:block;}
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 860px){
+    body{flex-direction:column;}
+    #panel{
+      width:100%;flex:0 0 auto;height:auto;max-height:52vh;
+      border-right:none;border-bottom:1px solid var(--line);
+    }
+    #viewport{flex:1;min-height:48vh;}
+  }
+</style>
+</head>
+<body>
+
+<aside id="panel">
+  <header>
+    <h1>Image → STL / OBJ</h1>
+    <p>Turn any photo into a printable heightmap relief. STL stays watertight; OBJ ships with the original image as a texture map. Everything runs locally — no servers, no AI.</p>
+  </header>
+
+  <section class="card">
+    <label class="upload" id="dropZone" for="fileInput">
+      <svg viewBox="0 0 24 24">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="17 8 12 3 7 8"></polyline>
+        <line x1="12" y1="3" x2="12" y2="15"></line>
+      </svg>
+      <strong>Choose an image</strong>
+      <span>or drag &amp; drop · JPG · PNG · WEBP</span>
+    </label>
+    <input id="fileInput" type="file" accept="image/*" hidden="">
+    <div id="fileName">No image selected</div>
+  </section>
+
+  <section class="card">
+    <h2>Parameters</h2>
+
+    <div class="field">
+      <label for="widthInput">Model width <output id="widthOut">100 mm</output></label>
+      <input id="widthInput" type="range" min="20" max="250" step="1" value="100">
+    </div>
+
+    <div class="field">
+      <label for="reliefInput">Max relief <output id="reliefOut">8.0 mm</output></label>
+      <input id="reliefInput" type="range" min="0.5" max="30" step="0.5" value="8">
+    </div>
+
+    <div class="field">
+      <label for="baseInput">Base thickness <output id="baseOut">2.0 mm</output></label>
+      <input id="baseInput" type="range" min="0.4" max="10" step="0.2" value="2">
+    </div>
+
+    <div class="field">
+      <label for="resInput">Resolution <output id="resOut">180</output></label>
+      <input id="resInput" type="range" min="32" max="300" step="4" value="180">
+    </div>
+
+    <div class="field">
+      <label for="smoothInput">Smoothing <output id="smoothOut">1</output></label>
+      <input id="smoothInput" type="range" min="0" max="6" step="1" value="1">
+    </div>
+
+    <div class="field checkbox">
+      <input id="invertInput" type="checkbox">
+      <label for="invertInput">Invert heights</label>
+    </div>
+  </section>
+
+  <div class="actions">
+    <button id="downloadBtn" class="primary" disabled="">Download STL</button>
+    <button id="downloadObjBtn" class="color" disabled="">Download OBJ (colored)</button>
+  </div>
+
+  <div id="status">Upload an image to begin.</div>
+</aside>
+
+<main id="viewport">
+  <canvas id="previewCanvas" data-engine="three.js r160" width="1552" height="1077" style="touch-action: none;"></canvas>
+  <div id="placeholder">Preview will appear here</div>
+  <div id="noWebgl" hidden="">WebGL is unavailable — 3D preview is disabled, but STL / OBJ export still works.</div>
+  <button id="fitBtn" title="Reset view">⟲</button>
+</main>
+
+<!-- ZIP bundling for the colored OBJ export (OBJ + MTL + texture PNG) -->
+<script src="./Image → STL _ OBJ (Colored) · Heightmap Relief Generator_files/jszip.min.js.download"></script>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { STLExporter } from 'three/addons/exporters/STLExporter.js';
+
+const JSZip = window.JSZip;
+
+/* =====================================================================
+   DOM references
+   ===================================================================== */
+const $ = (id) => document.getElementById(id);
+
+const fileInput      = $('fileInput');
+const fileNameEl     = $('fileName');
+const dropZone       = $('dropZone');
+const placeholder    = $('placeholder');
+const downloadBtn    = $('downloadBtn');
+const downloadObjBtn = $('downloadObjBtn');
+const statusEl       = $('status');
+const viewportEl     = $('viewport');
+const noWebglEl      = $('noWebgl');
+const fitBtn         = $('fitBtn');
+const previewCanvas  = $('previewCanvas');
+
+const widthInput  = $('widthInput');
+const widthOut    = $('widthOut');
+const reliefInput = $('reliefInput');
+const reliefOut   = $('reliefOut');
+const baseInput   = $('baseInput');
+const baseOut     = $('baseOut');
+const resInput    = $('resInput');
+const resOut      = $('resOut');
+const smoothInput = $('smoothInput');
+const smoothOut   = $('smoothOut');
+const invertInput = $('invertInput');
+
+/* =====================================================================
+   State
+   ===================================================================== */
+const state = {
+  img: null,
+  mesh: null,
+  texture: null,
+  needsFrame: false,
+};
+
+const previewMaterial = new THREE.MeshStandardMaterial({
+  color: 0xffffff,
+  roughness: 0.85,
+  metalness: 0.05,
+});
+
+let renderer = null;
+let previewScene = null;
+let previewCamera = null;
+let previewControls = null;
+
+/* =====================================================================
+   Parameter helpers
+   ===================================================================== */
+function getParams() {
+  return {
+    width:      parseFloat(widthInput.value),
+    relief:     parseFloat(reliefInput.value),
+    base:       parseFloat(baseInput.value),
+    resolution: parseInt(resInput.value, 10),
+    smoothing:  parseInt(smoothInput.value, 10),
+    invert:     invertInput.checked,
+  };
+}
+
+function syncOutputs() {
+  widthOut.textContent  = widthInput.value + ' mm';
+  reliefOut.textContent = parseFloat(reliefInput.value).toFixed(1) + ' mm';
+  baseOut.textContent   = parseFloat(baseInput.value).toFixed(1) + ' mm';
+  resOut.textContent    = resInput.value;
+  smoothOut.textContent = smoothInput.value;
+}
+
+/* =====================================================================
+   Heightfield construction (pure canvas math — no AI)
+   ===================================================================== */
+function computeGridDims(imgW, imgH, resolution) {
+  const aspect = imgW / imgH;
+  let cols, rows;
+  if (aspect >= 1) {
+    cols = resolution;
+    rows = Math.max(2, Math.round(resolution / aspect));
+  } else {
+    rows = resolution;
+    cols = Math.max(2, Math.round(resolution * aspect));
+  }
+  return { cols, rows, aspect };
+}
+
+function computeHeightfield(img, cols, rows, invert) {
+  const w = cols + 1;
+  const h = rows + 1;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+  // Neutral fill: fully transparent pixels read as mid-height.
+  ctx.fillStyle = '#808080';
+  ctx.fillRect(0, 0, w, h);
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, 0, 0, w, h);
+
+  const data = ctx.getImageData(0, 0, w, h).data;
+  const heights = new Float32Array(w * h);
+
+  for (let gy = 0; gy < h; gy++) {
+    const srcRow = h - 1 - gy;              // gy 0 = image bottom
+    const srcBase = srcRow * w * 4;
+    const dstBase = gy * w;
+    for (let gx = 0; gx < w; gx++) {
+      const si = srcBase + gx * 4;
+      const r = data[si]     / 255;
+      const g = data[si + 1] / 255;
+      const b = data[si + 2] / 255;
+      let l = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      if (invert) l = 1 - l;
+      heights[dstBase + gx] = l;
+    }
+  }
+  return heights;
+}
+
+function boxBlur(arr, w, h, radius) {
+  if (radius < 1) return arr;
+  const tmp = new Float32Array(w * h);
+  const out = new Float32Array(w * h);
+  const d = radius * 2 + 1;
+  const ci = (i, n) => (i < 0 ? 0 : i >= n ? n - 1 : i);
+
+  for (let y = 0; y < h; y++) {
+    const row = y * w;
+    let sum = 0;
+    for (let i = -radius; i <= radius; i++) sum += arr[row + ci(i, w)];
+    for (let x = 0; x < w; x++) {
+      tmp[row + x] = sum / d;
+      sum -= arr[row + ci(x - radius, w)];
+      sum += arr[row + ci(x + radius + 1, w)];
+    }
+  }
+  for (let x = 0; x < w; x++) {
+    let sum = 0;
+    for (let i = -radius; i <= radius; i++) sum += tmp[ci(i, h) * w + x];
+    for (let y = 0; y < h; y++) {
+      out[y * w + x] = sum / d;
+      sum -= tmp[ci(y - radius, h) * w + x];
+      sum += tmp[ci(y + radius + 1, h) * w + x];
+    }
+  }
+  return out;
+}
+
+function normalizeHeights(arr) {
+  let mn = Infinity, mx = -Infinity;
+  for (let i = 0; i < arr.length; i++) {
+    if (arr[i] < mn) mn = arr[i];
+    if (arr[i] > mx) mx = arr[i];
+  }
+  const range = (mx - mn) || 1;
+  for (let i = 0; i < arr.length; i++) arr[i] = (arr[i] - mn) / range;
+}
+
+/* =====================================================================
+   Watertight solid geometry (top relief + flat bottom + side walls)
+   ===================================================================== */
+function buildSolidGeometry(heights, cols, rows, W, H, base, relief) {
+  const nx = cols + 1;
+  const ny = rows + 1;
+  const n  = nx * ny;
+  const bottomOffset = n;
+
+  const positions = new Float32Array(n * 2 * 3);
+  const uvs       = new Float32Array(n * 2 * 2);
+  const indices   = [];
+
+  const dx = W / cols;
+  const dy = H / rows;
+
+  // ---- vertices (top + bottom) ----
+  for (let gy = 0; gy < ny; gy++) {
+    for (let gx = 0; gx < nx; gx++) {
+      const k = gy * nx + gx;
+      const x = gx * dx;
+      const y = gy * dy;
+      const z = base + heights[k] * relief;
+
+      const t3 = k * 3;
+      positions[t3]     = x;
+      positions[t3 + 1] = y;
+      positions[t3 + 2] = z;
+
+      uvs[k * 2]     = gx / cols;
+      uvs[k * 2 + 1] = gy / rows;
+
+      const kb = bottomOffset + k;
+      const b3 = kb * 3;
+      positions[b3]     = x;
+      positions[b3 + 1] = y;
+      positions[b3 + 2] = 0;
+
+      uvs[kb * 2]     = gx / cols;
+      uvs[kb * 2 + 1] = gy / rows;
+    }
+  }
+
+  // ---- top surface ----
+  for (let gy = 0; gy < rows; gy++) {
+    for (let gx = 0; gx < cols; gx++) {
+      const a = gy * nx + gx;
+      const b = a + 1;
+      const c = a + nx + 1;
+      const d = a + nx;
+      indices.push(a, b, c, a, c, d);
+    }
+  }
+
+  // ---- bottom surface (reversed winding) ----
+  for (let gy = 0; gy < rows; gy++) {
+    for (let gx = 0; gx < cols; gx++) {
+      const a = bottomOffset + gy * nx + gx;
+      const b = a + 1;
+      const c = a + nx + 1;
+      const d = a + nx;
+      indices.push(a, c, b, a, d, c);
+    }
+  }
+
+  // ---- side walls: CCW perimeter → outward-facing normals ----
+  const addWall = (aTop, aBot, bTop, bBot) => {
+    indices.push(aBot, bBot, bTop, aBot, bTop, aTop);
+  };
+
+  // bottom edge (gy = 0), gx ascending
+  for (let gx = 0; gx < cols; gx++) {
+    const a = gx, b = gx + 1;
+    addWall(a, bottomOffset + a, b, bottomOffset + b);
+  }
+  // right edge (gx = cols), gy ascending
+  for (let gy = 0; gy < rows; gy++) {
+    const a = gy * nx + cols;
+    const b = (gy + 1) * nx + cols;
+    addWall(a, bottomOffset + a, b, bottomOffset + b);
+  }
+  // top edge (gy = rows), gx descending
+  for (let gx = cols; gx > 0; gx--) {
+    const a = rows * nx + gx;
+    const b = rows * nx + gx - 1;
+    addWall(a, bottomOffset + a, b, bottomOffset + b);
+  }
+  // left edge (gx = 0), gy descending
+  for (let gy = rows; gy > 0; gy--) {
+    const a = gy * nx;
+    const b = (gy - 1) * nx;
+    addWall(a, bottomOffset + a, b, bottomOffset + b);
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('uv',       new THREE.BufferAttribute(uvs, 2));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  geo.computeBoundingBox();
+  geo.computeBoundingSphere();
+  return geo;
+}
+
+/* =====================================================================
+   WebGL preview
+   ===================================================================== */
+function webglAvailable() {
+  try {
+    const c = document.createElement('canvas');
+    return !!(window.WebGLRenderingContext &&
+             (c.getContext('webgl2') || c.getContext('webgl')));
+  } catch (e) { return false; }
+}
+
+function initPreview() {
+  renderer = new THREE.WebGLRenderer({
+    canvas: previewCanvas,
+    antialias: true,
+    alpha: true,
+    powerPreference: 'high-performance',
+  });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+  previewScene = new THREE.Scene();
+
+  previewCamera = new THREE.PerspectiveCamera(45, 1, 0.1, 10000);
+  previewCamera.up.set(0, 0, 1);              // Z-up, matching the STL orientation
+  previewCamera.position.set(120, -160, 140);
+
+  previewControls = new OrbitControls(previewCamera, previewCanvas);
+  previewControls.enableDamping = true;
+  previewControls.dampingFactor = 0.08;
+  previewControls.target.set(0, 0, 10);
+
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x1a2438, 2.2);
+  previewScene.add(hemi);
+
+  const key = new THREE.DirectionalLight(0xffffff, 3.2);
+  key.position.set(1, -1.6, 2);
+  previewScene.add(key);
+
+  const fill = new THREE.DirectionalLight(0x99bbff, 1.4);
+  fill.position.set(-1.6, 1.2, 0.6);
+  previewScene.add(fill);
+
+  resizePreview();
+  window.addEventListener('resize', resizePreview);
+
+  animate();
+}
+
+function resizePreview() {
+  if (!renderer) return;
+  const w = viewportEl.clientWidth;
+  const h = viewportEl.clientHeight;
+  if (w === 0 || h === 0) return;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(w, h, false);
+  previewCamera.aspect = w / h;
+  previewCamera.updateProjectionMatrix();
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  previewControls.update();
+  renderer.render(previewScene, previewCamera);
+}
+
+function frameCamera() {
+  if (!state.mesh || !previewCamera) return;
+
+  const geo = state.mesh.geometry;
+  geo.computeBoundingBox();
+  const bb = geo.boundingBox.clone();
+  bb.applyMatrix4(state.mesh.matrixWorld);
+
+  const center = new THREE.Vector3();
+  bb.getCenter(center);
+  const size = new THREE.Vector3();
+  bb.getSize(size);
+  const maxDim = Math.max(size.x, size.y, size.z);
+
+  const fov = THREE.MathUtils.degToRad(previewCamera.fov);
+  const dist = (maxDim / (2 * Math.tan(fov * 0.5))) * 1.35;
+
+  const dir = new THREE.Vector3(0.85, -1.1, 0.95).normalize();
+  previewCamera.position.copy(center).addScaledVector(dir, dist);
+  previewCamera.near = Math.max(0.1, dist / 100);
+  previewCamera.far  = dist * 20;
+  previewCamera.updateProjectionMatrix();
+
+  previewControls.target.copy(center);
+  previewControls.update();
+}
+
+/* =====================================================================
+   Rebuild pipeline
+   ===================================================================== */
+let rebuildTimer = 0;
+
+function scheduleRebuild() {
+  clearTimeout(rebuildTimer);
+  rebuildTimer = setTimeout(() => {
+    if (state.img) rebuild();
+  }, 120);
+}
+
+function rebuild() {
+  if (!state.img) return;
+
+  const p = getParams();
+  const { cols, rows, aspect } =
+    computeGridDims(state.img.width, state.img.height, p.resolution);
+
+  const W = p.width;
+  const H = W / aspect;
+
+  let heights = computeHeightfield(state.img, cols, rows, p.invert);
+  if (p.smoothing > 0) {
+    heights = boxBlur(heights, cols + 1, rows + 1, p.smoothing);
+  }
+  normalizeHeights(heights);
+
+  const geo = buildSolidGeometry(heights, cols, rows, W, H, p.base, p.relief);
+
+  if (state.mesh) {
+    if (previewScene) previewScene.remove(state.mesh);
+    state.mesh.geometry.dispose();
+  }
+
+  state.mesh = new THREE.Mesh(geo, previewMaterial);
+  state.mesh.position.set(-W / 2, -H / 2, 0);   // centre on the print bed
+  state.mesh.updateMatrixWorld(true);
+
+  if (previewScene) {
+    previewScene.add(state.mesh);
+    if (state.needsFrame) {
+      state.needsFrame = false;
+      frameCamera();
+    }
+    fitBtn.classList.add('show');
+  }
+
+  const triCount = geo.index.count / 3;
+  const bytes = 84 + 50 * triCount;
+  statusEl.textContent =
+    `Ready · ${triCount.toLocaleString()} triangles · ~${(bytes / (1024 * 1024)).toFixed(2)} MB STL`;
+}
+
+/* =====================================================================
+   Image loading
+   ===================================================================== */
+async function decodeFile(file) {
+  if ('createImageBitmap' in window) {
+    try { return await createImageBitmap(file); } catch (e) { /* fall through */ }
+  }
+  return await new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('decode failed')); };
+    img.src = url;
+  });
+}
+
+function makePreviewTexture(img) {
+  const MAX = 2048;
+  const w = img.width, h = img.height;
+  const scale = Math.min(1, MAX / Math.max(w, h));
+  const cw = Math.max(1, Math.round(w * scale));
+  const ch = Math.max(1, Math.round(h * scale));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = cw;
+  canvas.height = ch;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, 0, 0, cw, ch);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = renderer
+    ? Math.min(8, renderer.capabilities.getMaxAnisotropy())
+    : 4;
+  return tex;
+}
+
+async function loadImageFile(file) {
+  if (!file) return;
+  if (!file.type || !file.type.startsWith('image/')) {
+    statusEl.textContent = 'That file is not an image. Please choose a JPG, PNG or WEBP.';
+    return;
+  }
+
+  statusEl.textContent = 'Decoding image…';
+
+  let img;
+  try {
+    img = await decodeFile(file);
+  } catch (e) {
+    statusEl.textContent = 'Could not decode this image. Try another file.';
+    return;
+  }
+
+  if (!img.width || !img.height) {
+    statusEl.textContent = 'That image has no readable pixels.';
+    return;
+  }
+
+  if (state.img && typeof state.img.close === 'function') {
+    state.img.close();                     // release previous ImageBitmap
+  }
+
+  state.img = img;
+  state.needsFrame = true;
+
+  if (state.texture) state.texture.dispose();
+  state.texture = makePreviewTexture(img);
+
+  previewMaterial.map = state.texture;
+  previewMaterial.needsUpdate = true;
+
+  fileNameEl.textContent = file.name;
+  placeholder.hidden = true;
+  downloadBtn.disabled = false;
+  downloadObjBtn.disabled = false;
+
+  rebuild();
+}
+
+/* =====================================================================
+   STL export
+   ===================================================================== */
+function downloadSTL() {
+  if (!state.mesh) return;
+
+  statusEl.textContent = 'Exporting STL…';
+
+  // Defer so the status text paints before the synchronous export.
+  setTimeout(() => {
+    try {
+      state.mesh.updateMatrixWorld(true);
+
+      const src = state.mesh.geometry;
+      const geo = src.index ? src.toNonIndexed() : src.clone();
+
+      // STL only needs positions — drop the rest to save memory.
+      geo.deleteAttribute('uv');
+      geo.deleteAttribute('normal');
+      geo.applyMatrix4(state.mesh.matrixWorld);
+
+      const tmpMesh = new THREE.Mesh(geo, previewMaterial);
+      const exporter = new STLExporter();
+      const data = exporter.parse(tmpMesh, { binary: true });
+
+      geo.dispose();
+
+      const blob = new Blob([data], { type: 'application/octet-stream' });
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'relief.stl';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+      const triCount = src.index.count / 3;
+      const bytes = 84 + 50 * triCount;
+      statusEl.textContent =
+        `Exported STL · ${triCount.toLocaleString()} triangles · ${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+    } catch (err) {
+      console.error(err);
+      statusEl.textContent = 'STL export failed: ' + (err && err.message ? err.message : 'unknown error');
+    }
+  }, 30);
+}
+
+/* =====================================================================
+   OBJ export — colored (OBJ + MTL + texture PNG inside a ZIP)
+   ---------------------------------------------------------------------
+   The mesh already carries UVs and normals, so we write an OBJ that
+   references an MTL whose diffuse map points at the original image.
+   Blender / MeshLab / Windows 3D Viewer / Cura all render this in colour
+   when the ZIP is unpacked side-by-side.
+   ===================================================================== */
+
+function fmt(v) {
+  // 6 decimals is plenty for millimetre-scale models and keeps files small
+  return (Math.round(v * 1e6) / 1e6).toString();
+}
+
+function faceLine(a, b, c, hasUV, hasN) {
+  if (hasUV && hasN) return `f ${a}/${a}/${a} ${b}/${b}/${b} ${c}/${c}/${c}`;
+  if (hasUV)         return `f ${a}/${a} ${b}/${b} ${c}/${c}`;
+  if (hasN)          return `f ${a}//${a} ${b}//${b} ${c}//${c}`;
+  return `f ${a} ${b} ${c}`;
+}
+
+function serializeOBJ(geo) {
+  const pos = geo.attributes.position;
+  const uv  = geo.attributes.uv;
+  const nor = geo.attributes.normal;
+  const idx = geo.index;
+
+  const chunks = [];
+  chunks.push('# Image → STL / OBJ colored relief');
+  chunks.push('# Generated in-browser · no servers, no AI');
+  chunks.push('mtllib relief.mtl');
+  chunks.push('o relief');
+
+  // Vertices
+  const p = pos.array;
+  for (let i = 0; i < p.length; i += 3) {
+    chunks.push(`v ${fmt(p[i])} ${fmt(p[i + 1])} ${fmt(p[i + 2])}`);
+  }
+
+  // UVs (u in [0..1], v in [0..1], origin bottom-left → matches PNG sampler)
+  if (uv) {
+    const u = uv.array;
+    for (let i = 0; i < u.length; i += 2) {
+      chunks.push(`vt ${fmt(u[i])} ${fmt(u[i + 1])}`);
+    }
+  }
+
+  // Normals
+  if (nor) {
+    const n = nor.array;
+    for (let i = 0; i < n.length; i += 3) {
+      chunks.push(`vn ${fmt(n[i])} ${fmt(n[i + 1])} ${fmt(n[i + 2])}`);
+    }
+  }
+
+  chunks.push('usemtl relief_material');
+  chunks.push('s off');
+
+  const hasUV = !!uv;
+  const hasN  = !!nor;
+
+  if (idx) {
+    const a = idx.array;
+    for (let i = 0; i < a.length; i += 3) {
+      chunks.push(faceLine(a[i] + 1, a[i + 1] + 1, a[i + 2] + 1, hasUV, hasN));
+    }
+  } else {
+    for (let i = 1; i <= pos.count; i += 3) {
+      chunks.push(faceLine(i, i + 1, i + 2, hasUV, hasN));
+    }
+  }
+
+  return chunks.join('\n') + '\n';
+}
+
+function canvasToPngBlob(canvas) {
+  return new Promise((resolve) => {
+    if (!canvas || typeof canvas.toBlob !== 'function') return resolve(null);
+    try {
+      canvas.toBlob((blob) => resolve(blob), 'image/png');
+    } catch (e) {
+      resolve(null);
+    }
+  });
+}
+
+async function downloadOBJ() {
+  if (!state.mesh) return;
+
+  if (!JSZip) {
+    statusEl.textContent = 'ZIP bundler unavailable — please reload the page.';
+    return;
+  }
+
+  downloadObjBtn.disabled = true;
+  downloadSTLBlur(); // ensure focus isn't stolen mid-download
+  statusEl.textContent = 'Building colored OBJ…';
+
+  try {
+    state.mesh.updateMatrixWorld(true);
+
+    // Bake the mesh transform into a fresh geometry so the exported
+    // model is centred on the origin instead of offset by (-W/2, -H/2, 0).
+    const srcGeo = state.mesh.geometry;
+    const geo = srcGeo.clone();
+    geo.applyMatrix4(state.mesh.matrixWorld);
+
+    const vCount   = geo.attributes.position.count;
+    const triCount = srcGeo.index ? srcGeo.index.count / 3 : vCount / 3;
+
+    const objText = serializeOBJ(geo);
+    geo.dispose();
+
+    // Texture PNG — saved as-is so that OBJ UV (0,0) → PNG bottom-left
+    // maps to the bottom of the original image (matches the mesh layout).
+    let texBlob = null;
+    if (state.texture && state.texture.image) {
+      texBlob = await canvasToPngBlob(state.texture.image);
+    }
+
+    // Material library — only reference map_Kd when we actually ship a PNG
+    const mtlLines = [
+      '# Image → STL / OBJ colored relief',
+      'newmtl relief_material',
+      'Ka 1.000 1.000 1.000',
+      'Kd 1.000 1.000 1.000',
+      'Ks 0.000 0.000 0.000',
+      'Ns 10.0',
+      'd 1.0',
+      'illum 2',
+    ];
+    if (texBlob) mtlLines.push('map_Kd relief_texture.png');
+    const mtlText = mtlLines.join('\n') + '\n';
+
+    // Bundle
+    const zip = new JSZip();
+    zip.file('relief.obj', objText);
+    zip.file('relief.mtl', mtlText);
+    if (texBlob) zip.file('relief_texture.png', texBlob);
+
+    statusEl.textContent = 'Compressing ZIP…';
+
+    const zipBlob = await zip.generateAsync({
+      type: 'blob',
+      compression: 'DEFLATE',
+      compressionOptions: { level: 6 },
+    });
+
+    const url = URL.createObjectURL(zipBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'relief_colored.zip';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+    const mb = zipBlob.size / (1024 * 1024);
+    statusEl.textContent =
+      `Exported colored OBJ · ${vCount.toLocaleString()} verts · ` +
+      `${triCount.toLocaleString()} tris · ${texBlob ? 'textured' : 'no texture'} · ` +
+      `${mb.toFixed(2)} MB ZIP`;
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent =
+      'OBJ export failed: ' + (err && err.message ? err.message : 'unknown error');
+  } finally {
+    downloadObjBtn.disabled = false;
+  }
+}
+
+// Small helper so the export button visually releases focus cleanly
+function downloadSTLBlur() {
+  if (document.activeElement === downloadObjBtn) downloadObjBtn.blur();
+}
+
+/* =====================================================================
+   UI wiring
+   ===================================================================== */
+fileInput.addEventListener('change', (e) => {
+  const f = e.target.files && e.target.files[0];
+  if (f) loadImageFile(f);
+  e.target.value = '';
+});
+
+downloadBtn.addEventListener('click', downloadSTL);
+downloadObjBtn.addEventListener('click', downloadOBJ);
+fitBtn.addEventListener('click', frameCamera);
+
+[widthInput, reliefInput, baseInput, resInput, smoothInput].forEach((el) => {
+  el.addEventListener('input', () => {
+    syncOutputs();
+    scheduleRebuild();
+  });
+});
+
+invertInput.addEventListener('change', () => scheduleRebuild());
+
+/* ---- drag & drop ---- */
+let dragDepth = 0;
+window.addEventListener('dragenter', (e) => {
+  e.preventDefault();
+  dragDepth++;
+  dropZone.classList.add('drag');
+});
+window.addEventListener('dragover', (e) => e.preventDefault());
+window.addEventListener('dragleave', (e) => {
+  e.preventDefault();
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (dragDepth === 0) dropZone.classList.remove('drag');
+});
+window.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dragDepth = 0;
+  dropZone.classList.remove('drag');
+  const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  if (f) loadImageFile(f);
+});
+
+/* =====================================================================
+   Boot
+   ===================================================================== */
+syncOutputs();
+
+if (webglAvailable()) {
+  try {
+    initPreview();
+  } catch (err) {
+    console.warn('WebGL init failed:', err);
+    renderer = null;
+    previewScene = null;
+    noWebglEl.hidden = false;
+    placeholder.hidden = true;
+  }
+} else {
+  noWebglEl.hidden = false;
+  placeholder.hidden = true;
+  fitBtn.style.display = 'none';
+}
+</script>
+
+</body></html>
